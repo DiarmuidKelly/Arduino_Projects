@@ -166,16 +166,16 @@ void loop() {
     lightVal = analogRead(sensorPin); // read the current light levels
     Serial.println(lightVal);
     if(relay_flag == 0){
-      if(lightVal>=3500)
+      if(lightVal>=3500) //If it's dark turn off relay. Open circuit
         digitalWrite(relay_pin, LOW);
-      if(lightVal<3500)
-        digitalWrite(relay_pin, HIGH);
+      if(lightVal<3000)
+        digitalWrite(relay_pin, HIGH); // If it's bright. Close circuit
     }
     if(relay_flag == 1){
-      if(lightVal<3500)
+      if(lightVal<3000) // If it's getting light set flag 2
         relay_flag = 2;
     }
-    if(relay_flag == 2){
+    if(relay_flag == 2){ // If it's getting dark set flag 0
       if(lightVal>=3500)
         relay_flag = 0;
     }
