@@ -7,10 +7,6 @@
 #include "PubSubClient.h" // Connect and publish to the MQTT broker
 #include "config.h"
 
-#define DHTPIN 2
-#define DHTTYPE DHT11   // DHT 11
-DHT dht(DHTPIN, DHTTYPE);
-
 
 // Define NTP Client to get time
 WiFiUDP ntpUDP;
@@ -36,14 +32,20 @@ unsigned long lastTask = 0;                  // counter in example code for conn
 PubSubClient client(mqtt_server, 1883, wifi_client); 
 //Set up some global variables for the light level an initial value.
 //cosntants for the pins where sensors are plugged into.
-const int sensorPin = 34;
+
+
+#define DHTPIN 2
+#define DHTTYPE DHT11   // DHT 11
+DHT dht(DHTPIN, DHTTYPE);
+const int photoresistor_pin = 34;
 const int R_LED = 21;
 const int G_LED = 22;
 const int B_LED = 23;
-int lightVal;   // light reading
-int relay_pin = 15;
-int push_button = 4;
+const int relay_pin = 15;
+const int push_button = 4;
 
+
+int lightVal;
 int relay_flag = 0;
 
 const int capacity = JSON_OBJECT_SIZE(6);
@@ -53,8 +55,7 @@ StaticJsonDocument<capacity> doc;
 void setup() {
   
   Serial.begin(115200);
-  Serial.println(F("DHTxx test!"));
-  // Begin lights
+  Serial.println(F("DHT11 test!"));
   
   ledcAttachPin(R_LED, 1);
   ledcAttachPin(G_LED, 2);
@@ -67,85 +68,81 @@ void setup() {
 
 
   WiFi.mode(WIFI_STA);
-
-//  Serial.print("Connecting to ");
-//  Serial.println(ssid);
-//  WiFi.begin(ssid, password);
-//  while (WiFi.status() != WL_CONNECTED) {
-//    delay(500);
-//    Serial.print(".");
-//    WiFi.begin(ssid, password);
-//  }
-//  // Print local IP address and start web server
-//  Serial.println("");
-//  Serial.println("WiFi connected.");
-//  Serial.println("IP address: ");
-//  Serial.println(WiFi.localIP());
-
   // Initialize a NTPClient to get time
   timeClient.begin();
 
   dht.begin();
-
-  // Connect to MQTT Broker
-  // client.connect returns a boolean value to let us know if the connection was successful.
-  // If the connection is failing, make sure you are using the correct MQTT Username and Password (Setup Earlier in the Instructable)
-//  if (client.connect(clientID, mqtt_username, mqtt_password)) {
-//    Serial.println("Connected to MQTT Broker!");
-//  }
-//  else {
-//    Serial.println("Connection to MQTT Broker failed...");
-//  }
-
-
 }
 
+
+void led_control(int colour){
+  /* 
+   *  Sets the LED controller to print
+   *  case 1: Red
+   *  case 2: Green
+   *  case 3: Blue
+   *  case 4: Yellow
+   *  
+   */
+  ledcWrite(1, 0);
+  ledcWrite(2, 0);
+  ledcWrite(3, 0);
+  switch (colour) {
+    case 1:
+      ledcWrite(1, 10);
+      break;
+    case 2:
+      ledcWrite(2, 10);
+      break;
+    case 3:
+      ledcWrite(3, 10);
+      break;
+    case 4:
+      ledcWrite(1, 10);
+      ledcWrite(2, 10);
+      break;    
+  }
+  return;
+}
+
+
 void loop() {
-  if ((WiFi.status() != WL_CONNECTED) && (conn_stat != 1)) { conn_stat = 0; }
-//  if ((WiFi.status() == WL_CONNECTED) && !client.connected() && (conn_stat != 3))  { conn_stat = 2; }
-  if ((WiFi.status() == WL_CONNECTED) && (conn_stat != 5)) { conn_stat = 4;}
+  if ((WiFi.status() != WL_CONNECTED) && (conn_stat != 1)) { 
+    conn_stat = 0;
+    }
+  if ((WiFi.status() == WL_CONNECTED) && (conn_stat <= 1)) {
+    conn_stat = 2;
+    }
   switch (conn_stat) {
     case 0:                                                       // MQTT and WiFi down: start WiFi
-      ledcWrite(1, 10);
-      Serial.println("MQTT and WiFi down: start WiFi");
+      led_control(1);
+      Serial.println("WiFi down: start WiFi");
       WiFi.begin(ssid, password);
       conn_stat = 1;      
       break;
     case 1:                                                       // WiFi starting, do nothing here
-      ledcWrite(2, 10);
-      ledcWrite(1, 10);
+      led_control(4);
       Serial.println("WiFi starting, wait : "+ String(waitCount));
       waitCount++;
       if (waitCount % 1000 == 0){
         conn_stat = 0;
       }
       break;
-    case 2:                                                       // WiFi up, MQTT down: start MQTT
-      ledcWrite(2, 10);
-      ledcWrite(1, 10);
+    case 2:  // WiFi up, MQTT down: start MQTT
+      led_control(3);
       Serial.println("WiFi up, MQTT down: start MQTT");
-      client.connect(clientID, mqtt_username, mqtt_password);
-      conn_stat = 3;
-      waitCount = 0;
-      break;
-    case 3:
-      ledcWrite(2, 10);
-      ledcWrite(1, 10);// WiFi up, MQTT starting, do nothing here
-      Serial.println("WiFi up, MQTT starting, wait : "+ String(waitCount));
-      waitCount++;
-      if (waitCount % 1000 == 0){
-        conn_stat = 2;
+      if(client.connect(clientID, mqtt_username, mqtt_password)){
+        conn_stat = 3;
+        timeClient.update();
+        Serial.println(timeClient.getFormattedTime());
+        waitCount = 0;
       }
       break;
-    case 4:                                                       // WiFi up, MQTT up: finish MQTT configuration
+    case 3:
       Serial.println("WiFi up, MQTT up: finish MQTT configuration");
-      client.connect(clientID, mqtt_username, mqtt_password);
-      //mqttClient.subscribe(output_topic);
-      //mqttClient.publish(input_topic, Version);
       conn_stat = 5;      
-      ledcWrite(1, 0);              
-      ledcWrite(2, 0);              
-      break;
+      led_control(2);             
+      break;      
   }
   if (conn_stat == 5){        
     delay(500);
@@ -162,9 +159,8 @@ void loop() {
        }
       Serial.println(relay_flag); 
     }
-    ledcWrite(2, 0);
-    lightVal = analogRead(sensorPin); // read the current light levels
-    Serial.println(lightVal);
+    led_control(0);             
+    lightVal = analogRead(photoresistor_pin); // read the current light levels
     if(relay_flag == 0){
       if(lightVal>=3500) //If it's dark turn off relay. Open circuit
         digitalWrite(relay_pin, LOW);
@@ -182,18 +178,8 @@ void loop() {
 
     // PUBLISH to the MQTT Broker (topic = Temperature, defined at the beginning)
     if (millis() - lastTask > 30000) {                                 // Print message every 30 seconds
-      Serial.println("print this every 30 seconds");
       lastTask = millis();
-      ledcWrite(2, 10);
-      ledcWrite(1, 10);
-      client.connect(clientID, mqtt_username, mqtt_password);
-      delay(100);
-      
-      timeClient.update();
-      String cur_time = timeClient.getFormattedTime();
-      Serial.println(cur_time);
-      doc["time"].set(cur_time);
-      
+      led_control(4);             
       // Reading temperature or humidity takes about 250 milliseconds!
       // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
       float h = dht.readHumidity();
@@ -212,29 +198,42 @@ void loop() {
       float hif = dht.computeHeatIndex(f, h);
       // Compute heat index in Celsius (isFahreheit = false)
       float hic = dht.computeHeatIndex(t, h, false);
-    
-      doc["humidity"].set(h);
-      doc["temp"].set(t);
-      doc["heat_i"].set(hic);
-      doc["light"].set(lightVal);
+
       
-      char JSONmessageBuffer[capacity];
-      serializeJson(doc, JSONmessageBuffer);
+      if(client.connect(clientID, mqtt_username, mqtt_password)){        
+        timeClient.update();
+        String cur_time = timeClient.getFormattedTime();
+        Serial.println(cur_time);
       
-      if (client.publish(data_topic, JSONmessageBuffer)) {
-        Serial.println("Data sent!");
+        doc["humidity"].set(h);
+        doc["temp"].set(t);
+        doc["heat_i"].set(hic);
+        doc["light"].set(lightVal);
+        doc["time"].set(cur_time);
+        
+        char JSONmessageBuffer[capacity];
+        serializeJson(doc, JSONmessageBuffer);
+        
+        if (client.publish(data_topic, JSONmessageBuffer)) {
+          Serial.println("Data sent!");
+        }
+        // Again, client.publish will return a boolean value depending on whether it succeeded or not.
+        // If the message failed to send, we will try again, as the connection may have broken.
+        else {
+          Serial.println("Data failed to send. Reconnecting to MQTT Broker and trying again");
+          if(client.connect(clientID, mqtt_username, mqtt_password)){
+            delay(100); // This delay ensures that client.publish doesn't clash with the client.connect call
+            client.publish(data_topic, JSONmessageBuffer);
+          }
+          else{
+            Serial.println("Data failed to send. MQTT broker unreachable");
+            led_control(3);
+            delay(500); // This delay ensures that client.publish doesn't clash with the client.connect call
+          }
+        }
+        client.disconnect();  // disconnect from the MQTT broker
       }
-      // Again, client.publish will return a boolean value depending on whether it succeeded or not.
-      // If the message failed to send, we will try again, as the connection may have broken.
-      else {
-        Serial.println("Data failed to send. Reconnecting to MQTT Broker and trying again");
-        client.connect(clientID, mqtt_username, mqtt_password);
-        delay(100); // This delay ensures that client.publish doesn't clash with the client.connect call
-        client.publish(data_topic, JSONmessageBuffer);
-      }
-      client.disconnect();  // disconnect from the MQTT broker
-      ledcWrite(1, 0);
-      ledcWrite(2, 0);    
+      led_control(0);             
       
       Serial.print(F("Humidity: "));
       Serial.print(h);
