@@ -28,7 +28,7 @@ int relay_flag = 0;
 void setup() {
 
   Serial.begin(115200);
-  Serial.println(F("HPI - Human Plant Interface"));
+  Serial.println(F("H-PI - Human-Plant Interface"));
   
   pinMode(pump1, OUTPUT);
   pinMode(pump2, OUTPUT);
@@ -58,13 +58,22 @@ void handlePushButton() {
   }
 }
 
+void pumps_off(){
+  digitalWrite(pump1, LOW);
+  digitalWrite(pump2, LOW);
+  digitalWrite(pump3, LOW);
+  digitalWrite(pump4, LOW);
+  digitalWrite(indicator_led, LOW);
+
+}
+
 void handlePumps_dummy(){
     digitalWrite(indicator_led, HIGH);
     Serial.println("pump");
     delay(2000);
     Serial.println("pump");
-    digitalWrite(indicator_led, LOW);
-  }
+    pumps_off();
+}
 
 void handlePumps(){
   digitalWrite(pump1, HIGH);
@@ -75,8 +84,7 @@ void handlePumps(){
   digitalWrite(pump3, HIGH);
   digitalWrite(pump4, HIGH);
   delay(5000);
-  digitalWrite(pump3, LOW);
-  digitalWrite(pump4, LOW);
+  pumps_off();
 }
 
 void loop() {
