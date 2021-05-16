@@ -157,6 +157,9 @@ void loop() {
       if(relay_flag == 0){
         relay_flag = 1;
         digitalWrite(relay_pin, HIGH);
+        Serial.println("ON"); 
+        Serial.println(relay_pin); 
+        delay(500);
       } else{
         relay_flag = 0;
        }
