@@ -1,5 +1,5 @@
 # Arduino_Projects
-Repository of various Arduino projects mostly written for homeautomation
+Repository of various Arduino projects mostly written for home automation
 
 ## DHT_LDR
 ### Requirements
