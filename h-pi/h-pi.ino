@@ -1,4 +1,34 @@
+#include "config.h"
+// #include "connection_status.h"
+#include <ArduinoJson.h>
+#include <WiFi.h>
+#include <NTPClient.h>
+#include <WiFiClientSecure.h>
+#include <WiFiUdp.h>
+#include "PubSubClient.h"
 
+
+// Define NTP Client to get time
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
+
+// MQTT config imported from config.h
+const char* mqtt_server = mqtt_server_config;  // IP of the MQTT broker
+const char* mqtt_username = mqtt_username_config; // MQTT username
+const char* mqtt_password = mqtt_password_config; // MQTT password
+const char* data_topic = data_topic_name; 
+const char* clientID = thing_id; 
+
+
+WiFiClient wifi_client;
+const char* ssid     = ssid_config;
+const char* password = password_config;
+
+PubSubClient client(mqtt_server, 1883, wifi_client);
+
+
+const int capacity = JSON_OBJECT_SIZE(6);
+StaticJsonDocument<capacity> doc;
 
 /*
  * Pump configurations
@@ -29,6 +59,7 @@ void setup() {
 
   Serial.begin(115200);
   Serial.println(F("H-PI - Human-Plant Interface"));
+  Serial.println(F("H-PI - Human-Plant Interface"));
   
   pinMode(pump1, OUTPUT);
   pinMode(pump2, OUTPUT);
@@ -45,6 +76,8 @@ void setup() {
 
   attachInterrupt(digitalPinToInterrupt(push_button), handlePushButton, FALLING); // trigger when button pressed, but not when released.
 
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
 
 }
 
@@ -72,6 +105,18 @@ void handlePumps_dummy(){
     Serial.println("pump");
     delay(2000);
     Serial.println("pump");
+    timeClient.update();
+    String cur_time = timeClient.getFormattedTime();
+    doc["humidity"].set(100);
+    doc["time"].set(cur_time);
+
+    char JSONmessageBuffer[capacity];
+    serializeJson(doc, JSONmessageBuffer);
+    
+    if (client.connect(clientID, mqtt_username, mqtt_password)) {
+      delay(50); // This delay ensures that client.publish doesn't clash with the client.connect call
+      client.publish(data_topic, JSONmessageBuffer);
+    }
     pumps_off();
 }
 
