@@ -58,8 +58,7 @@ int relay_flag = 0;
 void setup() {
 
   Serial.begin(115200);
-  Serial.println(F("H-PI - Human-Plant Interface"));
-  Serial.println(F("H-PI - Human-Plant Interface"));
+  Serial.println(clientID);
   
   pinMode(pump1, OUTPUT);
   pinMode(pump2, OUTPUT);
