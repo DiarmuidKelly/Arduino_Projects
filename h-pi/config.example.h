@@ -1,5 +1,5 @@
 #define VERSION "Alpha v0.1";
-#define thing_id "h-pi: " + VERSION;
+#define thing_id "h-pi: Human-Plant Interface";
 #define data_topic_name "/h-pi/data";
 
 #define ssid_config "wifi_ssid";

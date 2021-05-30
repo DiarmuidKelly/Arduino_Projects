@@ -74,7 +74,11 @@ void IRAM_ATTR onTimer() {
 void setup() {
 
   Serial.begin(115200);
+<<<<<<< HEAD
   Serial.println(F("H-PI - Human-Plant Interface"));
+=======
+  Serial.println(clientID);
+>>>>>>> fb735801b6955f0682a0a5cc31e2a2bfd5c2632a
   
   pinMode(pump1, OUTPUT);
   pinMode(pump2, OUTPUT);
