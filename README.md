@@ -13,6 +13,8 @@ version 1.4.2
 
 ArduinoJson
 
+NTPClient
+
 pubsubclient
 ```
 https://github.com/knolleary/pubsubclient
