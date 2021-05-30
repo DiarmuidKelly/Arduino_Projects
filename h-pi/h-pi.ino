@@ -17,16 +17,21 @@ const char* mqtt_server = mqtt_server_config;  // IP of the MQTT broker
 const char* mqtt_username = mqtt_username_config; // MQTT username
 const char* mqtt_password = mqtt_password_config; // MQTT password
 const char* data_topic = data_topic_name; 
+const char* config_topic = config_topic_name; 
 const char* clientID = thing_id; 
-char* interr_time_rate = interr_time_rate;  // IP of the MQTT broker
+const char* region = thing_region; 
+const char* measurement = thing_measurement; 
+const int interr_time_rate = interr_time_rate_config;  // IP of the MQTT broker
 
 
 WiFiClient wifi_client;
 const char* ssid     = ssid_config;
 const char* password = password_config;
 
+
 PubSubClient client(mqtt_server, 1883, wifi_client);
 
+//PubSubClient client(mqtt_server, 1883, wifi_client);
 
 const int capacity = JSON_OBJECT_SIZE(12);
 StaticJsonDocument<capacity> doc;
@@ -74,11 +79,8 @@ void IRAM_ATTR onTimer() {
 void setup() {
 
   Serial.begin(115200);
-<<<<<<< HEAD
   Serial.println(F("H-PI - Human-Plant Interface"));
-=======
   Serial.println(clientID);
->>>>>>> fb735801b6955f0682a0a5cc31e2a2bfd5c2632a
   
   pinMode(pump1, OUTPUT);
   pinMode(pump2, OUTPUT);
@@ -97,15 +99,27 @@ void setup() {
 
   timer = timerBegin(0, 80, true);
   timerAttachInterrupt(timer, &onTimer, true);
-  print(interr_time_rate);
-  interr_time_rate = interr_time_rate.toInt();
   timerAlarmWrite(timer, interr_time_rate, true);
-  timerAlarmEnable(timer);
   pumps_off();
   
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
+  
+  client.setCallback(callback);
 
+}
+
+void callback(char* topic, byte* message, unsigned int length) {
+  Serial.print("Message arrived on topic: ");
+  Serial.print(topic);
+  String messageTemp;
+  
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)message[i]);
+    messageTemp += (char)message[i];
+  }
+  Serial.println();
+  Serial.print(messageTemp);
 }
 
 void connection_status() {
@@ -132,18 +146,25 @@ void connection_status() {
       }
       break;
     case 2:  // WiFi up, MQTT down: start MQTT
-      Serial.println("WiFi up, MQTT down: start MQTT");
-      if (client.connect(clientID, mqtt_username, mqtt_password)) {
+      if (!client.connected()){
+        Serial.println("WiFi up, MQTT down: start MQTT");
+        if (client.connect(clientID, mqtt_username, mqtt_password)) {
+          conn_stat = 3;
+          client.subscribe(config_topic);
+          timeClient.update();
+          Serial.print("Formatted time configured: ");
+          Serial.println(timeClient.getFormattedTime());
+          waitCount = 0;
+        }
+      }
+      else {
         conn_stat = 3;
-        timeClient.update();
-        Serial.print("Formatted time configured: ");
-        Serial.println(timeClient.getFormattedTime());
-        waitCount = 0;
       }
       break;
     case 3:
       Serial.println("WiFi up, MQTT up: finished MQTT configuration");
       conn_stat = 5;
+      timerAlarmEnable(timer);
       break;
   }
   delay(10);
@@ -199,18 +220,17 @@ void loop() {
     relay_flag = 0;
   }
   if (interrupt_flag == 1){
+    JsonObject tags = doc.createNestedObject("tags");
+    JsonObject fields = doc.createNestedObject("fields");
     if (client.connect(clientID, mqtt_username, mqtt_password)) {
       timeClient.update();
       String cur_time = timeClient.getFormattedTime();
       Serial.println(cur_time);
-      doc["measurement"].set("esp32_apartment_2");
+      doc["measurement"].set(measurement);
       JsonObject tags = doc.createNestedObject("tags");
-      tags["host"].set("esp32-2");
-      tags["region"].set("eu-centre");
+      tags["host"].set(thing_id);
+      tags["region"].set(region);
       doc["time"].set(cur_time);
-
-      JsonObject fields = doc.createNestedObject("fields");
-
             
       soilmoisturepercent = map(analogRead(moisture_sensor1), AirValue1, WaterValue, 0, 100);
       Serial.print(soilmoisturepercent);
@@ -243,6 +263,7 @@ void loop() {
           Serial.println("Data failed to send. MQTT broker unreachable");
         }
       }
+      doc.clear();
       client.disconnect();  // disconnect from the MQTT broker
     }
         

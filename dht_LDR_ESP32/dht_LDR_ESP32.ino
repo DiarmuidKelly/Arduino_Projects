@@ -14,10 +14,12 @@ NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
 
 // MQTT config imported from config.h
 const char* mqtt_server = mqtt_server_config;  // IP of the MQTT broker
-const char* data_topic = "apartment/sensor1/data";
+const char* data_topic = data_topic_name;
 const char* mqtt_username = mqtt_username_config; // MQTT username
 const char* mqtt_password = mqtt_password_config; // MQTT password
-const char* clientID = "sensor1"; // MQTT client ID
+const char* clientID = thing_id; // MQTT client ID
+const char* region = thing_region; 
+const char* measurement = thing_measurement; 
 
 // WIFI
 WiFiClient wifi_client;
@@ -45,7 +47,7 @@ const int push_button = 4;
 int lightVal;
 int relay_flag = 0;
 
-const int capacity = JSON_OBJECT_SIZE(6);
+const int capacity = JSON_OBJECT_SIZE(12);
 StaticJsonDocument<capacity> doc;
 
 hw_timer_t * timer = NULL;
@@ -247,15 +249,21 @@ void loop() {
 
 
         if (client.connect(clientID, mqtt_username, mqtt_password)) {
+          JsonObject tags = doc.createNestedObject("tags");
+          JsonObject fields = doc.createNestedObject("fields");
           timeClient.update();
           String cur_time = timeClient.getFormattedTime();
           Serial.println(cur_time);
-
-          doc["humidity"].set(h);
-          doc["temp"].set(t);
-          doc["heat_i"].set(hic);
-          doc["light"].set(lightVal);
+          
+          doc["measurement"].set(measurement);
+          tags["host"].set(thing_id);
+          tags["region"].set(region);
           doc["time"].set(cur_time);
+
+          fields["humidity"].set(h);
+          fields["temp"].set(t);
+          fields["heat_i"].set(hic);
+          fields["light"].set(lightVal);
 
           char JSONmessageBuffer[capacity];
           serializeJson(doc, JSONmessageBuffer);
@@ -276,6 +284,7 @@ void loop() {
               led_control(3);
             }
           }
+          doc.clear();
           client.disconnect();  // disconnect from the MQTT broker
         }
         led_control(0);
