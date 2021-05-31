@@ -104,8 +104,6 @@ void setup() {
   
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  
-  client.setCallback(callback);
 
 }
 
@@ -150,7 +148,10 @@ void connection_status() {
         Serial.println("WiFi up, MQTT down: start MQTT");
         if (client.connect(clientID, mqtt_username, mqtt_password)) {
           conn_stat = 3;
-          client.subscribe(config_topic);
+          client.setServer(mqtt_server, 1883);
+          client.setCallback(callback);
+          Serial.println(client.subscribe(config_topic));
+
           timeClient.update();
           Serial.print("Formatted time configured: ");
           Serial.println(timeClient.getFormattedTime());
@@ -214,6 +215,7 @@ void handlePumps(){
 
 void loop() {
   connection_status();
+  client.loop();
   if (relay_flag == 1){
     handlePumps();
     Serial.println("Pump");
@@ -264,7 +266,6 @@ void loop() {
         }
       }
       doc.clear();
-      client.disconnect();  // disconnect from the MQTT broker
     }
         
     interrupt_flag = 0;
