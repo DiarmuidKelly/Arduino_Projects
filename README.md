@@ -27,6 +27,9 @@ https://en.wikipedia.org/wiki/Finite-state_machine
 
 Reference for state managment in industrial control systems
 
+## Testing Protobuffs
+https://jpa.kapsi.fi/nanopb/docs/#getting-started
+
 ### Requirements
 ESP32 board support 
 ```

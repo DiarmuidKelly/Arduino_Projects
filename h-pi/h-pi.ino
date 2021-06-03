@@ -7,6 +7,12 @@
 #include <WiFiUdp.h>
 #include "PubSubClient.h"
 
+#include "message.pb.h"
+
+#include "pb_common.h"
+#include "pb.h"
+#include "pb_encode.h"
+
 
 // Define NTP Client to get time
 WiFiUDP ntpUDP;
@@ -18,6 +24,8 @@ const char* mqtt_username = mqtt_username_config; // MQTT username
 const char* mqtt_password = mqtt_password_config; // MQTT password
 const char* data_topic = data_topic_name; 
 const char* config_topic = config_topic_name; 
+const char* measure_topic = measure_topic_name; 
+const char* pump_topic = pump_topic_name; 
 const char* clientID = thing_id; 
 const char* region = thing_region; 
 const char* measurement = thing_measurement; 
@@ -80,6 +88,9 @@ void setup() {
 
   Serial.begin(115200);
   Serial.println(F("H-PI - Human-Plant Interface"));
+  Packet message = Packet_init_zero;
+  message.measurement =  thing_measurement;
+  
   Serial.println(clientID);
   
   pinMode(pump1, OUTPUT);
@@ -150,7 +161,9 @@ void connection_status() {
           conn_stat = 3;
           client.setServer(mqtt_server, 1883);
           client.setCallback(callback);
-          Serial.println(client.subscribe(config_topic));
+          client.subscribe(config_topic);
+          client.subscribe(measure_topic);
+          client.subscribe(pump_topic);
 
           timeClient.update();
           Serial.print("Formatted time configured: ");
