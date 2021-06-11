@@ -1,5 +1,4 @@
 #include "config.h"
-// #include "connection_status.h"
 #include <ArduinoJson.h>
 #include <WiFi.h>
 #include <NTPClient.h>
@@ -22,15 +21,15 @@ WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
 
 // MQTT config imported from config.h
-const char *mqtt_server = mqtt_server_config;     // IP of the MQTT broker
-const char *mqtt_username = mqtt_username_config; // MQTT username
-const char *mqtt_password = mqtt_password_config; // MQTT password
+const char *mqtt_server = mqtt_server_config;     
+const char *mqtt_username = mqtt_username_config;
+const char *mqtt_password = mqtt_password_config; 
 const char *data_topic = data_topic_name;
 const char *config_topic = config_topic_name;
 const char *clientID = thing_id;
 const char *region = thing_region;
 char *measurement = thing_measurement;
-const int interr_time_rate = interr_time_rate_config; // IP of the MQTT broker
+const int interr_time_rate = interr_time_rate_config;
 
 /*
 * Wireless config
@@ -130,7 +129,7 @@ void setup()
   * Push button pin 
   */
   pinMode(push_button, INPUT_PULLUP);
-  attachInterrupt(digitalPinToInterrupt(push_button), handlePushButton, RISING); // trigger when button pressed, but not when released.
+  attachInterrupt(digitalPinToInterrupt(push_button), handlePushButton, FALLING); // trigger when button pressed (pullup), but not when released.
 
   /*
   * Configure Timer
