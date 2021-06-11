@@ -1,5 +1,0 @@
-
-Packet.measurement max_size:20;
-Packet.tags max_size:20;
-Packet.time max_size:20;
-Packet.fields max_size:20;

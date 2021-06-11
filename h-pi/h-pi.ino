@@ -7,13 +7,6 @@
 #include <WiFiUdp.h>
 #include "PubSubClient.h"
 
-#include "message.pb.h"
-
-#include "pb_common.h"
-#include "pb.h"
-#include "pb_encode.h"
-
-
 // Define NTP Client to get time
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
@@ -88,8 +81,6 @@ void setup() {
 
   Serial.begin(115200);
   Serial.println(F("H-PI - Human-Plant Interface"));
-  Packet message = Packet_init_zero;
-  message.measurement =  thing_measurement;
   
   Serial.println(clientID);
   
