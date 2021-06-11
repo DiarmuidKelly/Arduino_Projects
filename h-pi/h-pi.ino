@@ -12,7 +12,18 @@
 #include "pb_common.h"
 #include "pb.h"
 #include "pb_encode.h"
+#include "pb_decode.h"
 
+
+/*
+*
+* Enable Test mode
+*
+*/
+
+int test_mode = 1;
+
+//---------------------------------------
 
 // Define NTP Client to get time
 WiFiUDP ntpUDP;
@@ -28,8 +39,11 @@ const char* measure_topic = measure_topic_name;
 const char* pump_topic = pump_topic_name; 
 const char* clientID = thing_id; 
 const char* region = thing_region; 
-const char* measurement = thing_measurement; 
+char* measurement = thing_measurement; 
 const int interr_time_rate = interr_time_rate_config;  // IP of the MQTT broker
+
+
+char* test;
 
 
 WiFiClient wifi_client;
@@ -43,6 +57,8 @@ PubSubClient client(mqtt_server, 1883, wifi_client);
 
 const int capacity = JSON_OBJECT_SIZE(12);
 StaticJsonDocument<capacity> doc;
+char JSONmessageBuffer[capacity];
+
 
 /*
  * Pump configurations
@@ -72,6 +88,13 @@ uint8_t conn_stat = 0;
 unsigned long waitCount = 0;
 
 
+bool status;
+uint8_t buffer[100];
+uint8_t out_buffer[100];
+Packet message = Packet_init_zero;
+pb_ostream_t stream = pb_ostream_from_buffer(buffer, sizeof(buffer));
+pb_istream_t out_stream = pb_istream_from_buffer(out_buffer, sizeof(out_buffer));
+
 hw_timer_t * timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 int interrupt_flag = 1;
@@ -84,13 +107,57 @@ void IRAM_ATTR onTimer() {
   
   }
 
+bool encode_string(pb_ostream_t* stream, const pb_field_t* field, void* const* arg)
+{
+    const char* str = (const char*)(*arg);
+    
+    if (!pb_encode_tag_for_field(stream, field))
+        return false;
+
+    return pb_encode_string(stream, (uint8_t*)str, strlen(str));
+}
+
+bool print_string(pb_istream_t *stream, const pb_field_t *field, void **arg)
+{
+    uint8_t buffer[1024] = {0};
+    
+    /* We could read block-by-block to avoid the large buffer... */
+    if (stream->bytes_left > sizeof(buffer) - 1)
+        return false;
+    
+    if (!pb_read(stream, buffer, stream->bytes_left))
+        return false;
+    
+    /* Print the string, in format comparable with protoc --decode.
+     * Format comes from the arg defined in main().
+     */
+    Serial.print("Test: ");
+    Serial.printf((char*)*arg, buffer);
+    return true;
+}
+
 void setup() {
 
   Serial.begin(115200);
   Serial.println(F("H-PI - Human-Plant Interface"));
-  Packet message = Packet_init_zero;
-  message.measurement =  thing_measurement;
   
+  message.measurement.arg =  measurement;
+  message.measurement.funcs.encode = &encode_string;
+  message.tags.funcs.decode = &print_string;
+  message.cur_time.funcs.decode = &print_string;
+  message.fields.funcs.decode = &print_string;
+
+
+  JsonObject tags = doc.createNestedObject("tags");
+  tags["host"].set(thing_id);
+  tags["region"].set(region);
+  
+  serializeJson(tags, JSONmessageBuffer);
+  
+  message.tags.arg = JSONmessageBuffer;
+  message.tags.funcs.encode = &encode_string;
+  JSONmessageBuffer[0] = '\0';
+    
   Serial.println(clientID);
   
   pinMode(pump1, OUTPUT);
@@ -230,7 +297,12 @@ void loop() {
   connection_status();
   client.loop();
   if (relay_flag == 1){
-    handlePumps();
+    if (test_mode == 1){
+      handlePumps_dummy();
+    }
+    else{
+      handlePumps();
+    }
     Serial.println("Pump");
     relay_flag = 0;
   }
@@ -239,13 +311,12 @@ void loop() {
     JsonObject fields = doc.createNestedObject("fields");
     if (client.connect(clientID, mqtt_username, mqtt_password)) {
       timeClient.update();
+      char char_time[50];
       String cur_time = timeClient.getFormattedTime();
-      Serial.println(cur_time);
-      doc["measurement"].set(measurement);
-      JsonObject tags = doc.createNestedObject("tags");
-      tags["host"].set(thing_id);
-      tags["region"].set(region);
-      doc["time"].set(cur_time);
+      cur_time.toCharArray(char_time, 50);
+      Serial.println(cur_time);     
+      message.cur_time.arg = char_time;
+      message.cur_time.funcs.encode = &encode_string;
             
       soilmoisturepercent = map(analogRead(moisture_sensor1), AirValue1, WaterValue, 0, 100);
       Serial.print(soilmoisturepercent);
@@ -260,8 +331,13 @@ void loop() {
       soilmoisturepercent = map(analogRead(moisture_sensor3), AirValue2, WaterValue, 0, 100);
       Serial.println(soilmoisturepercent);
       fields["soil_sensor_3"].set(soilmoisturepercent);
+
+      serializeJson(fields, JSONmessageBuffer);
+      
+      message.fields.arg = JSONmessageBuffer;
+      message.fields.funcs.encode = &encode_string;
+      JSONmessageBuffer[0] = '\0';
   
-      char JSONmessageBuffer[capacity];
       serializeJson(doc, JSONmessageBuffer);
       if (client.publish(data_topic, JSONmessageBuffer)) {
         Serial.println("Data sent!");
@@ -278,6 +354,26 @@ void loop() {
           Serial.println("Data failed to send. MQTT broker unreachable");
         }
       }
+     
+      Serial.print("Message: ");
+      status = pb_decode(&out_stream, Packet_fields, &message);
+      if (!status)
+        {
+            Serial.println(PB_GET_ERROR(&out_stream));
+        }
+      message.measurement.arg =  measurement;
+      Serial.print("\n\n");
+      Serial.print("Buffer:");
+      Serial.print((char*)out_buffer);
+      Serial.print("\n\n\n");
+
+      // message.measurement.arg = test;
+      // Serial.print("TEST: ");
+      // Serial.println(message.measurement);
+      // Serial.println(message.measurement);
+      // if (client.publish(data_topic, JSONmessageBuffer)) {
+      //   Serial.println("PB sent!");
+      // }
       doc.clear();
     }
         

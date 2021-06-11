@@ -11,9 +11,9 @@
 
 /* Struct definitions */
 typedef struct _Packet { 
-    char measurement[20]; 
+    pb_callback_t measurement; 
     pb_callback_t tags; 
-    char time[20]; 
+    pb_callback_t cur_time; 
     pb_callback_t fields; 
 } Packet;
 
@@ -23,20 +23,20 @@ extern "C" {
 #endif
 
 /* Initializer values for message structs */
-#define Packet_init_default                      {"", {{NULL}, NULL}, "", {{NULL}, NULL}}
-#define Packet_init_zero                         {"", {{NULL}, NULL}, "", {{NULL}, NULL}}
+#define Packet_init_default                      {{{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}}
+#define Packet_init_zero                         {{{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}, {{NULL}, NULL}}
 
 /* Field tags (for use in manual encoding/decoding) */
 #define Packet_measurement_tag                   1
 #define Packet_tags_tag                          2
-#define Packet_time_tag                          3
+#define Packet_cur_time_tag                      3
 #define Packet_fields_tag                        4
 
 /* Struct field encoding specification for nanopb */
 #define Packet_FIELDLIST(X, a) \
-X(a, STATIC,   SINGULAR, STRING,   measurement,       1) \
+X(a, CALLBACK, SINGULAR, STRING,   measurement,       1) \
 X(a, CALLBACK, REPEATED, STRING,   tags,              2) \
-X(a, STATIC,   SINGULAR, STRING,   time,              3) \
+X(a, CALLBACK, SINGULAR, STRING,   cur_time,          3) \
 X(a, CALLBACK, REPEATED, STRING,   fields,            4)
 #define Packet_CALLBACK pb_default_field_callback
 #define Packet_DEFAULT NULL

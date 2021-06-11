@@ -4,6 +4,6 @@ syntax = "proto3";
 message Packet {
   string measurement = 1;
   repeated string tags = 2;
-  string time = 3;
-	repeated string fields = 4;
+  string cur_time = 3;
+  repeated string fields = 4;
 }

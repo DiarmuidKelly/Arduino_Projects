@@ -872,4 +872,3 @@ template <typename GenMessageT> struct MessageDescriptor;
 #endif  /* __cplusplus */
 
 #endif
-

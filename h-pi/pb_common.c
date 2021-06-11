@@ -385,4 +385,3 @@ bool pb_validate_utf8(const char *str)
 }
 
 #endif
-
