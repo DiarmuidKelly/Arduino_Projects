@@ -7,6 +7,17 @@
 #include <WiFiUdp.h>
 #include "PubSubClient.h"
 
+
+/*
+*
+* Enable Test mode
+*
+*/
+
+int test_mode = 1;
+
+//---------------------------------------
+
 // Define NTP Client to get time
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
@@ -21,8 +32,9 @@ const char* measure_topic = measure_topic_name;
 const char* pump_topic = pump_topic_name; 
 const char* clientID = thing_id; 
 const char* region = thing_region; 
-const char* measurement = thing_measurement; 
+char* measurement = thing_measurement; 
 const int interr_time_rate = interr_time_rate_config;  // IP of the MQTT broker
+
 
 
 WiFiClient wifi_client;
@@ -36,6 +48,10 @@ PubSubClient client(mqtt_server, 1883, wifi_client);
 
 const int capacity = JSON_OBJECT_SIZE(12);
 StaticJsonDocument<capacity> doc;
+char JSONmessageBuffer[capacity];
+JsonObject tags = doc.createNestedObject("tags");
+JsonObject fields = doc.createNestedObject("fields");
+
 
 /*
  * Pump configurations
@@ -47,9 +63,12 @@ const int pump4 = 25;
 const int moisture_sensor1 = 32;
 const int moisture_sensor2 = 35;
 const int moisture_sensor3 = 34;
-const int AirValue1 = 470;  
-const int AirValue2 = 550; 
-const int WaterValue = 210;
+int AirValue1 = 470;  
+int AirValue2 = 550; 
+int AirValue3 = 550; 
+int WaterValue1 = 210;
+int WaterValue2 = 210;
+int WaterValue3 = 210;
 int soilmoisturepercent=0;
 int val = 0;
 
@@ -64,7 +83,6 @@ int relay_flag = 0;
 uint8_t conn_stat = 0;
 unsigned long waitCount = 0;
 
-
 hw_timer_t * timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 int interrupt_flag = 1;
@@ -75,13 +93,19 @@ void IRAM_ATTR onTimer() {
    */
   interrupt_flag = 1;
   
-  }
+}
 
 void setup() {
 
   Serial.begin(115200);
   Serial.println(F("H-PI - Human-Plant Interface"));
   
+  tags["host"].set(thing_id);
+  tags["region"].set(region);
+  
+  serializeJson(tags, JSONmessageBuffer);
+
+  doc["measurement"] = measurement;
   Serial.println(clientID);
   
   pinMode(pump1, OUTPUT);
@@ -109,7 +133,7 @@ void setup() {
 
 }
 
-void callback(char* topic, byte* message, unsigned int length) {
+void message_callback(char* topic, byte* message, unsigned int length) {
   Serial.print("Message arrived on topic: ");
   Serial.print(topic);
   String messageTemp;
@@ -118,8 +142,21 @@ void callback(char* topic, byte* message, unsigned int length) {
     Serial.print((char)message[i]);
     messageTemp += (char)message[i];
   }
-  Serial.println();
-  Serial.print(messageTemp);
+  Serial.println(messageTemp);
+  DynamicJsonDocument in_doc(1024);
+  deserializeJson(in_doc, messageTemp);
+  JsonObject obj = in_doc.as<JsonObject>();
+  String received = obj["fields"];
+  Serial.println(received);
+  deserializeJson(in_doc, received);
+  obj = in_doc.as<JsonObject>();
+  AirValue1 = obj["Air_threshold_1"];
+  AirValue2 = obj["Air_threshold_2"];
+  AirValue3 = obj["Air_threshold_3"];
+  WaterValue1 = obj["Liquid_threshold_1"];
+  WaterValue2 = obj["Liquid_threshold_2"];
+  WaterValue3 = obj["Liquid_threshold_3"];
+  relay_flag = obj["Pump_on"];
 }
 
 void connection_status() {
@@ -151,10 +188,8 @@ void connection_status() {
         if (client.connect(clientID, mqtt_username, mqtt_password)) {
           conn_stat = 3;
           client.setServer(mqtt_server, 1883);
-          client.setCallback(callback);
+          client.setCallback(message_callback);
           client.subscribe(config_topic);
-          client.subscribe(measure_topic);
-          client.subscribe(pump_topic);
 
           timeClient.update();
           Serial.print("Formatted time configured: ");
@@ -221,41 +256,39 @@ void loop() {
   connection_status();
   client.loop();
   if (relay_flag == 1){
-    handlePumps();
+    if (test_mode == 1){
+      handlePumps_dummy();
+    }
+    else{
+      handlePumps();
+    }
     Serial.println("Pump");
     relay_flag = 0;
   }
   if (interrupt_flag == 1){
-    JsonObject tags = doc.createNestedObject("tags");
-    JsonObject fields = doc.createNestedObject("fields");
     if (client.connect(clientID, mqtt_username, mqtt_password)) {
       timeClient.update();
       String cur_time = timeClient.getFormattedTime();
-      Serial.println(cur_time);
-      doc["measurement"].set(measurement);
-      JsonObject tags = doc.createNestedObject("tags");
-      tags["host"].set(thing_id);
-      tags["region"].set(region);
-      doc["time"].set(cur_time);
-            
-      soilmoisturepercent = map(analogRead(moisture_sensor1), AirValue1, WaterValue, 0, 100);
-      Serial.print(soilmoisturepercent);
-      Serial.print(",");
+      doc["time"] = cur_time;
+                  
+      soilmoisturepercent = map(analogRead(moisture_sensor1), AirValue1, WaterValue1, 0, 100);
+      // Serial.print(soilmoisturepercent);
+      // Serial.print(",");
       fields["soil_sensor_1"].set(soilmoisturepercent);
       
-      soilmoisturepercent = map(analogRead(moisture_sensor2), AirValue2, WaterValue, 0, 100);
-      Serial.print(soilmoisturepercent);
-      Serial.print(",");
+      soilmoisturepercent = map(analogRead(moisture_sensor2), AirValue2, WaterValue2, 0, 100);
+      // Serial.print(soilmoisturepercent);
+      // Serial.print(",");
       fields["soil_sensor_2"].set(soilmoisturepercent);
       
-      soilmoisturepercent = map(analogRead(moisture_sensor3), AirValue2, WaterValue, 0, 100);
-      Serial.println(soilmoisturepercent);
+      soilmoisturepercent = map(analogRead(moisture_sensor3), AirValue3, WaterValue3, 0, 100);
+      // Serial.println(soilmoisturepercent);
       fields["soil_sensor_3"].set(soilmoisturepercent);
   
-      char JSONmessageBuffer[capacity];
       serializeJson(doc, JSONmessageBuffer);
       if (client.publish(data_topic, JSONmessageBuffer)) {
-        Serial.println("Data sent!");
+        // Serial.print("Data sent!");
+        Serial.println();
       }
       // Again, client.publish will return a boolean value depending on whether it succeeded or not.
       // If the message failed to send, we will try again, as the connection may have broken.
@@ -269,7 +302,8 @@ void loop() {
           Serial.println("Data failed to send. MQTT broker unreachable");
         }
       }
-      doc.clear();
+      
+      doc["time"] = 0;
     }
         
     interrupt_flag = 0;
