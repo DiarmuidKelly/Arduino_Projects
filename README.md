@@ -20,6 +20,9 @@ pubsubclient
 https://github.com/knolleary/pubsubclient
 ```
 
+Change the 
+#define MQTT_MAX_PACKET_SIZE 512
+
 ## H-PI
 ```
 https://en.wikipedia.org/wiki/Finite-state_machine
