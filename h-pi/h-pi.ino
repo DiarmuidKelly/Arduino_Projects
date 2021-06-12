@@ -16,7 +16,7 @@ int test_mode = 0;
 
 // Define NTP Client to get time
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", 3600, 60000);
+NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", time_zone, 60000);
 
 // MQTT config imported from config.h
 const char *mqtt_server = mqtt_server_config;     
@@ -27,7 +27,7 @@ const char *config_topic = config_topic_name;
 const char *clientID = thing_id;
 const char *region = thing_region;
 char *measurement = thing_measurement;
-const int interr_time_rate = interr_time_rate_config;
+int interr_time_rate = interr_time_rate_config;
 int pump_timeout = pump_timeout_config;
 
 /*
@@ -44,7 +44,7 @@ PubSubClient client(mqtt_server, 1883, wifi_client);
 /*
 * JSON objects
 */
-const int capacity = JSON_OBJECT_SIZE(12);
+const int capacity = JSON_OBJECT_SIZE(16);
 StaticJsonDocument<capacity> doc;
 char JSONmessageBuffer[capacity];
 JsonObject tags = doc.createNestedObject("tags");
@@ -61,7 +61,7 @@ int pump1_timeout = 0;
 int pump2_timeout = 0;
 int pump3_timeout = 0;
 int pump4_timeout = 0;
-const int pump_threshold = 60;
+int pump_threshold = 60;
 const int moisture_sensor1 = 32;
 const int moisture_sensor2 = 35;
 const int moisture_sensor3 = 34;
@@ -211,6 +211,9 @@ void message_callback(char *topic, byte *message, unsigned int length)
   p2_delay = obj["PD2"];
   p3_delay = obj["PD3"];
   p4_delay = obj["PD4"];
+  interr_time_rate = obj["UF"];
+  pump_timeout = obj["PTO"];
+  pump_threshold = obj["PTV"];
 }
 
 void connection_status()
@@ -300,6 +303,10 @@ void handlePumps_dummy()
   pump2_timeout = pump_timeout;
   pump3_timeout = pump_timeout;
   pump4_timeout = pump_timeout;
+  fields["p1"].set(1);
+  fields["p2"].set(1);
+  fields["p3"].set(1);
+  fields["p4"].set(1);
   Serial.println("pump_dummy");
   pumps_off();
 }
@@ -311,6 +318,10 @@ void handlePumps()
   pump_select(pump2, p2_delay, &pump2_timeout);
   pump_select(pump3, p3_delay, &pump3_timeout);
   pump_select(pump4, p4_delay, &pump4_timeout);
+  fields["p1"].set(1);
+  fields["p2"].set(1);
+  fields["p3"].set(1);
+  fields["p4"].set(1);
   Serial.println("pump finished");
   pumps_off();
 }
@@ -350,22 +361,32 @@ void loop()
       soilmoisturepercent = map(analogRead(moisture_sensor1), AirValue1, WaterValue1, 0, 100);
       Serial.print(soilmoisturepercent);
       Serial.print(",");
-      fields["soil_sensor_1"].set(soilmoisturepercent);
+      fields["ss1"].set(soilmoisturepercent);
 
       soilmoisturepercent = map(analogRead(moisture_sensor2), AirValue2, WaterValue2, 0, 100);
       Serial.print(soilmoisturepercent);
       Serial.print(",");
-      fields["soil_sensor_2"].set(soilmoisturepercent);
+      fields["ss2"].set(soilmoisturepercent);
 
       soilmoisturepercent = map(analogRead(moisture_sensor3), AirValue3, WaterValue3, 0, 100);
-      Serial.print(soilmoisturepercent);
-      fields["soil_sensor_3"].set(soilmoisturepercent);
+      Serial.println(soilmoisturepercent);
+      fields["ss3"].set(soilmoisturepercent);
+
+      fields["p1"].set(int(fields["p1"]));
+      fields["p2"].set(int(fields["p2"]));
+      fields["p3"].set(int(fields["p3"]));
+      fields["p4"].set(int(fields["p4"]));
 
       serializeJson(doc, JSONmessageBuffer);
       if (client.publish(data_topic, JSONmessageBuffer))
       {
-        // Serial.print("Data sent!");
-        Serial.println();
+        Serial.println("Data sent!");
+        int t = fields["p1"];
+        Serial.println(t);
+        fields["p1"].set(0);
+        fields["p2"].set(0);
+        fields["p3"].set(0);
+        fields["p4"].set(0);
       }
       // Again, client.publish will return a boolean value depending on whether it succeeded or not.
       // If the message failed to send, we will try again, as the connection may have broken.
@@ -381,8 +402,13 @@ void loop()
         {
           Serial.println("Data failed to send. MQTT broker unreachable");
         }
+        fields["p1"].set(0);
+        fields["p2"].set(0);
+        fields["p3"].set(0);
+        fields["p4"].set(0);
       }
-      if (fields["soil_sensor_1"] < pump_threshold && pump3_timeout == 0){
+
+      if (fields["ss1"] < pump_threshold && pump3_timeout == 0){
         if (test_mode == 1)
         {
           handlePumps_dummy();
@@ -391,8 +417,9 @@ void loop()
         {
             pump_select(pump3, p3_delay, &pump3_timeout);
         }
+        fields["p3"].set(1);
       }
-      if (fields["soil_sensor_2"] < pump_threshold && pump4_timeout == 0){
+      if (fields["ss2"] < pump_threshold && pump4_timeout == 0){
         if (test_mode == 1)
         {
           handlePumps_dummy();
@@ -401,8 +428,9 @@ void loop()
         {
         pump_select(pump4, p4_delay, &pump4_timeout);
         }
+        fields["p4"].set(1);
       }
-      if (fields["soil_sensor_3"] < pump_threshold && pump1_timeout == 0 && pump2_timeout == 0){
+      if (fields["ss3"] < pump_threshold && pump1_timeout == 0 && pump2_timeout == 0){
         if (test_mode == 1)
         {
           handlePumps_dummy();
@@ -412,6 +440,8 @@ void loop()
         pump_select(pump1, p1_delay, &pump1_timeout);
         pump_select(pump2, p2_delay, &pump2_timeout);
         }
+        fields["p1"].set(1);
+        fields["p2"].set(1);
       }
       Serial.println(pump1_timeout);
       Serial.println(pump2_timeout);
