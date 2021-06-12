@@ -7,9 +7,7 @@
 #include "PubSubClient.h"
 
 /*
-*
 * Enable Test mode
-*
 */
 
 int test_mode = 0;
@@ -30,6 +28,7 @@ const char *clientID = thing_id;
 const char *region = thing_region;
 char *measurement = thing_measurement;
 const int interr_time_rate = interr_time_rate_config;
+int pump_timeout = pump_timeout_config;
 
 /*
 * Wireless config
@@ -58,19 +57,24 @@ const int pump1 = 14;
 const int pump2 = 27;
 const int pump3 = 26;
 const int pump4 = 25;
+int pump1_timeout = 0;
+int pump2_timeout = 0;
+int pump3_timeout = 0;
+int pump4_timeout = 0;
+const int pump_threshold = 60;
 const int moisture_sensor1 = 32;
 const int moisture_sensor2 = 35;
 const int moisture_sensor3 = 34;
-int AirValue1 = 470;
-int AirValue2 = 550;
-int AirValue3 = 550;
-int WaterValue1 = 210;
-int WaterValue2 = 210;
-int WaterValue3 = 210;
-int p1_delay = 10000; // Pump delays (seconds)
+int AirValue1 = 3300;
+int AirValue2 = 3200;
+int AirValue3 = 2800;
+int WaterValue1 = 1200;
+int WaterValue2 = 1000;
+int WaterValue3 = 1000;
+int p1_delay = 10000; // Pump delays (milliseconds)
 int p2_delay = 10000;
 int p3_delay = 2000;
-int p4_delay = 3000;
+int p4_delay = 4000;
 int soilmoisturepercent = 0;
 const int push_button = 12;
 const int indicator_led = 21;
@@ -80,6 +84,7 @@ const int indicator_led = 21;
 */
 String cur_time;
 hw_timer_t *timer = NULL;
+hw_timer_t *timer_pump_timeout = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 int interrupt_flag = 1;
 int relay_flag = 0;
@@ -90,6 +95,25 @@ void IRAM_ATTR onTimer()
    * Handle interrupt flag for reading photoresistor
    */
   interrupt_flag = 1;
+}
+
+void IRAM_ATTR pumpTimer()
+{
+  /*
+   * 
+   */
+  if(pump1_timeout > 0){
+    pump1_timeout--;
+  }
+  if(pump2_timeout > 0){
+    pump2_timeout--;
+  }
+  if(pump3_timeout > 0){
+    pump3_timeout--;
+  }
+  if(pump4_timeout > 0){
+    pump4_timeout--;
+  }
 }
 
 void setup()
@@ -137,6 +161,12 @@ void setup()
   timer = timerBegin(0, 80, true);
   timerAttachInterrupt(timer, &onTimer, true);
   timerAlarmWrite(timer, interr_time_rate, true);
+  timerAlarmEnable(timer);
+
+  timer_pump_timeout = timerBegin(1, 80, true);
+  timerAttachInterrupt(timer_pump_timeout, &pumpTimer, true);
+  timerAlarmWrite(timer_pump_timeout, 1000000, true); // Every second
+  timerAlarmEnable(timer_pump_timeout);
 
   /*
   * Configure Wifi
@@ -236,7 +266,6 @@ void connection_status()
   case 3:
     Serial.println("WiFi up, MQTT up: finished MQTT configuration");
     conn_stat = 5;
-    timerAlarmEnable(timer);
     break;
   }
   delay(10);
@@ -267,6 +296,10 @@ void handlePumps_dummy()
   digitalWrite(indicator_led, HIGH);
   Serial.println("pump_dummy");
   delay(2000);
+  pump1_timeout = pump_timeout;
+  pump2_timeout = pump_timeout;
+  pump3_timeout = pump_timeout;
+  pump4_timeout = pump_timeout;
   Serial.println("pump_dummy");
   pumps_off();
 }
@@ -274,18 +307,19 @@ void handlePumps_dummy()
 void handlePumps()
 {
   Serial.println("pump starting");
-  digitalWrite(pump1, LOW);
-  delay(p1_delay);
-  pumps_off();
-  digitalWrite(pump2, LOW);
-  delay(p2_delay);
-  pumps_off();
-  digitalWrite(pump3, LOW);
-  delay(p3_delay);
-  pumps_off();
-  digitalWrite(pump4, LOW);
-  delay(p4_delay);
+  pump_select(pump1, p1_delay, &pump1_timeout);
+  pump_select(pump2, p2_delay, &pump2_timeout);
+  pump_select(pump3, p3_delay, &pump3_timeout);
+  pump_select(pump4, p4_delay, &pump4_timeout);
   Serial.println("pump finished");
+  pumps_off();
+}
+
+void pump_select(int32_t pump, int32_t pump_time, int* pump_timeout_val)
+{
+  digitalWrite(pump, LOW);
+  delay(pump_time);
+  *pump_timeout_val = pump_timeout;
   pumps_off();
 }
 
@@ -324,7 +358,7 @@ void loop()
       fields["soil_sensor_2"].set(soilmoisturepercent);
 
       soilmoisturepercent = map(analogRead(moisture_sensor3), AirValue3, WaterValue3, 0, 100);
-      Serial.println(soilmoisturepercent);
+      Serial.print(soilmoisturepercent);
       fields["soil_sensor_3"].set(soilmoisturepercent);
 
       serializeJson(doc, JSONmessageBuffer);
@@ -348,6 +382,43 @@ void loop()
           Serial.println("Data failed to send. MQTT broker unreachable");
         }
       }
+      if (fields["soil_sensor_1"] < pump_threshold && pump3_timeout == 0){
+        if (test_mode == 1)
+        {
+          handlePumps_dummy();
+        }
+        else
+        {
+            pump_select(pump3, p3_delay, &pump3_timeout);
+        }
+      }
+      if (fields["soil_sensor_2"] < pump_threshold && pump4_timeout == 0){
+        if (test_mode == 1)
+        {
+          handlePumps_dummy();
+        }
+        else
+        {
+        pump_select(pump4, p4_delay, &pump4_timeout);
+        }
+      }
+      if (fields["soil_sensor_3"] < pump_threshold && pump1_timeout == 0 && pump2_timeout == 0){
+        if (test_mode == 1)
+        {
+          handlePumps_dummy();
+        }
+        else
+        {
+        pump_select(pump1, p1_delay, &pump1_timeout);
+        pump_select(pump2, p2_delay, &pump2_timeout);
+        }
+      }
+      Serial.println(pump1_timeout);
+      Serial.println(pump2_timeout);
+      Serial.println(pump3_timeout);
+      Serial.println(pump4_timeout);
+
+
       doc["time"] = 0;
     }
     interrupt_flag = 0;
