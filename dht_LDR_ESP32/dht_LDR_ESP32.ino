@@ -1,4 +1,4 @@
-#include "DHT.h"
+#include <DHT.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
 #include <NTPClient.h>
@@ -43,12 +43,17 @@ const int B_LED = 23;
 const int relay_pin = 15;
 const int push_button = 4;
 
-
+float h, t, f, hif, hic;
 int lightVal;
 int relay_flag = 0;
+String cur_time;
 
-const int capacity = JSON_OBJECT_SIZE(12);
+const int capacity = JSON_OBJECT_SIZE(16);
 StaticJsonDocument<capacity> doc;
+char JSONmessageBuffer[capacity];
+JsonObject tags = doc.createNestedObject("tags");
+JsonObject fields = doc.createNestedObject("fields");
+          
 
 hw_timer_t * timer = NULL;
 hw_timer_t * timer1 = NULL;
@@ -100,6 +105,10 @@ void setup() {
   WiFi.mode(WIFI_STA);
   // Initialize a NTPClient to get time
   timeClient.begin();
+
+  doc["measurement"] = measurement;
+  tags["host"].set(thing_id);
+  tags["region"].set(region);
 
   dht.begin();
 }
@@ -194,12 +203,6 @@ void handlePushButton() {
 }
 
 void loop() {
-  /* 
-   *  Check if the connection needs to be checked. Handle this function
-   *  Check if the Light sensor needs to be read based on timer interrupt flag
-   *  Inside the latter if loop, check if 30 seconds has passed since sending data
-   *  to MQTT. If so, send the data JSON to the MQTT broker.
-   */
   if (connection_flag == 1){
     connection_status();
     connection_flag = 0;
@@ -211,9 +214,15 @@ void loop() {
       Serial.println(lightVal);
       if (relay_flag == 0) {
         if (lightVal >= 3500) //If it's dark turn off relay. Open circuit
+        {
           digitalWrite(relay_pin, LOW);
-        if (lightVal < 2800)
+          Serial.println("Turn off");
+        }
+        else if (lightVal < 2800)
+        {
           digitalWrite(relay_pin, HIGH); // If it's bright. Close circuit
+          Serial.println("Turn on");
+        }
       }
       if (relay_flag == 1) {
         if (lightVal < 2800) // If it's getting light set flag 2
@@ -224,17 +233,17 @@ void loop() {
           relay_flag = 0;
       }
 
-      // PUBLISH to the MQTT Broker (topic = Temperature, defined at the beginning)
-      if (millis() - lastTask > 30000) {   // Print message every 30 seconds
+      if (millis() - lastTask > send_frequency) {   // Send data at regular intervals
         lastTask = millis();
         led_control(4);
-        // Reading temperature or humidity takes about 250 milliseconds!
-        // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
-        float h = dht.readHumidity();
-        // Read temperature as Celsius (the default)
-        float t = dht.readTemperature();
-        // Read temperature as Fahrenheit (isFahrenheit = true)
-        float f = dht.readTemperature(true);
+        h = dht.readHumidity();
+        t = dht.readTemperature();
+        // Fahrenheit
+        f = dht.readTemperature(true);
+
+        Serial.println(h);
+        Serial.println(t);
+        Serial.println(f);
 
         // Check if any reads failed and exit early (to try again).
         if (isnan(h) || isnan(t) || isnan(f)) {
@@ -243,36 +252,26 @@ void loop() {
         }
 
         // Compute heat index in Fahrenheit (the default)
-        float hif = dht.computeHeatIndex(f, h);
+        hif = dht.computeHeatIndex(f, h);
         // Compute heat index in Celsius (isFahreheit = false)
-        float hic = dht.computeHeatIndex(t, h, false);
+        hic = dht.computeHeatIndex(t, h, false);
 
 
         if (client.connect(clientID, mqtt_username, mqtt_password)) {
-          JsonObject tags = doc.createNestedObject("tags");
-          JsonObject fields = doc.createNestedObject("fields");
           timeClient.update();
-          String cur_time = timeClient.getFormattedTime();
-          Serial.println(cur_time);
-          
-          doc["measurement"].set(measurement);
-          tags["host"].set(thing_id);
-          tags["region"].set(region);
+          cur_time = timeClient.getFormattedTime();          
           doc["time"].set(cur_time);
 
-          fields["humidity"].set(h);
-          fields["temp"].set(t);
-          fields["heat_i"].set(hic);
-          fields["light"].set(lightVal);
+          fields["humidity"].set(int(h));
+          fields["temp"].set(float(t + 0.0001));
+          fields["heat_i"].set(float(hic + 0.0001));
+          fields["light"].set(int(lightVal));
 
-          char JSONmessageBuffer[capacity];
           serializeJson(doc, JSONmessageBuffer);
 
           if (client.publish(data_topic, JSONmessageBuffer)) {
             Serial.println("Data sent!");
           }
-          // Again, client.publish will return a boolean value depending on whether it succeeded or not.
-          // If the message failed to send, we will try again, as the connection may have broken.
           else {
             Serial.println("Data failed to send. Reconnecting to MQTT Broker and trying again");
             if (client.connect(clientID, mqtt_username, mqtt_password)) {
@@ -284,24 +283,13 @@ void loop() {
               led_control(3);
             }
           }
-          doc.clear();
           client.disconnect();  // disconnect from the MQTT broker
         }
         led_control(0);
 
-        Serial.print(F("Humidity: "));
-        Serial.print(h);
-        Serial.print(F("%  Temperature: "));
-        Serial.print(t);
-        Serial.print(F("°C "));
-        Serial.print(f);
-        Serial.print(F("°F  Heat index: "));
-        Serial.print(hic);
-        Serial.print(F("°C "));
-        Serial.print(hif);
-        Serial.println(F("°F"));
-        Serial.println(lightVal);
+        Serial.println(JSONmessageBuffer);
       }
+      doc["time"] = 0;    
     }
     interrupt_flag = 0;
   }

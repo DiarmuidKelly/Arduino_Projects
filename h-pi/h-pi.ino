@@ -16,7 +16,7 @@ int test_mode = 0;
 
 // Define NTP Client to get time
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", time_zone, 60000);
+NTPClient timeClient(ntpUDP, "europe.pool.ntp.org", (int)time_zone, 60000);
 
 // MQTT config imported from config.h
 const char *mqtt_server = mqtt_server_config;     
@@ -128,7 +128,6 @@ void setup()
   */
   tags["host"].set(thing_id);
   tags["region"].set(region);
-  serializeJson(tags, JSONmessageBuffer);
 
   doc["measurement"] = measurement;
 
