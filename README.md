@@ -1,40 +1,88 @@
 # Arduino_Projects
-Repository of various Arduino projects mostly written for home automation
 
-## DHT_LDR
-### Requirements
-ESP32 board support 
-```
+See related MQTT project for InfluxDB time series data records: [Project Repo](hhttps://github.com/DiarmuidKelly/MQTT)
+
+Repository of various Arduino projects mostly written for home automation.
+
+| Project | Description |
+| ----------- | ----------- |
+| DHT_LDR | Read DHT11 sensor for temperature and humidity readings. Read Photosensor and control power relay based on cutoff threshold. Report readings to MQTT broker |
+| H-PI | Read capacitive soil moisture sensors and control pump actuators. Report moisture % and pump statuses to MQTT broker. |
+
+## Contents
+
+* [Requirements](#Requirements)
+* [H-PI Specific Requirements](#H-PI-Specific)
+* [DHT_LDR Specific Requirements](#DHT_LDR-Specific)
+
+## Requirements
+
+ESP32 board support
+
+```bash
 https://dl.espressif.com/dl/package_esp32_index.json
 ```
 
-DHT sensor Library - Adafruit
-version 1.4.2
+### ArduinoJson
 
-ArduinoJson
-
-NTPClient
-
-pubsubclient
+```bash
+https://github.com/bblanchon/ArduinoJson
 ```
+
+### NTPClient
+
+```bash
+https://github.com/arduino-libraries/NTPClient
+```
+
+### pubsubclient
+
+```bash
 https://github.com/knolleary/pubsubclient
 ```
 
-Change the 
-#define MQTT_MAX_PACKET_SIZE 512
+#### Configuration
 
-## H-PI
+```PubSubClient.h```
+
+```cpp
+// MQTT_MAX_PACKET_SIZE : Maximum packet size. Override with setBufferSize().
+#ifndef MQTT_MAX_PACKET_SIZE
+#define MQTT_MAX_PACKET_SIZE 1024
+#endif
 ```
-https://en.wikipedia.org/wiki/Finite-state_machine
+
+## H-PI Specific
+
+### pubsubclient Configuration
+
+```PubSubClient.h```
+
+```cpp
+// MQTT_MAX_PACKET_SIZE : Maximum packet size. Override with setBufferSize().
+#ifndef MQTT_MAX_PACKET_SIZE
+#define MQTT_MAX_PACKET_SIZE 1024
+#endif
 ```
+
+### Misc
 
 Reference for state managment in industrial control systems
 
-## Testing Protobuffs
-https://jpa.kapsi.fi/nanopb/docs/#getting-started
-
-### Requirements
-ESP32 board support 
+```bash
+https://en.wikipedia.org/wiki/Finite-state_machine
 ```
-https://dl.espressif.com/dl/package_esp32_index.json
+
+## DHT_LDR Specific
+
+### DHT sensor Library - Adafruit
+
+```bash
+https://github.com/adafruit/DHT-sensor-library
+```
+
+**Dependency**: Adafruit Unified Sensor Driver
+
+```bash
+https://github.com/adafruit/Adafruit_Sensor
 ```
