@@ -54,17 +54,6 @@ https://github.com/knolleary/pubsubclient
 
 ## H-PI Specific
 
-### pubsubclient Configuration
-
-```PubSubClient.h```
-
-```cpp
-// MQTT_MAX_PACKET_SIZE : Maximum packet size. Override with setBufferSize().
-#ifndef MQTT_MAX_PACKET_SIZE
-#define MQTT_MAX_PACKET_SIZE 1024
-#endif
-```
-
 ### Misc
 
 Reference for state managment in industrial control systems
