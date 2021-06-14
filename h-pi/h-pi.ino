@@ -138,7 +138,6 @@ void setup()
   pinMode(pump2, OUTPUT);
   pinMode(pump3, OUTPUT);
   pinMode(pump4, OUTPUT);
-  pinMode(pump1, OUTPUT);
   pinMode(indicator_led, OUTPUT);
 
   /*
