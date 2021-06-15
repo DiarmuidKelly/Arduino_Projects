@@ -1,6 +1,6 @@
 # Arduino_Projects
 
-See related MQTT project for InfluxDB time series data records: [Project Repo](hhttps://github.com/DiarmuidKelly/MQTT)
+See related MQTT project for InfluxDB time series data records: [Project Repo](https://github.com/DiarmuidKelly/MQTT)
 
 Repository of various Arduino projects mostly written for home automation.
 
