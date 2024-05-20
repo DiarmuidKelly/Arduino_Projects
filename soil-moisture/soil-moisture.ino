@@ -1,3 +1,6 @@
+#include <DHT_U.h>
+#include <DHT.h>
+
 #include "config.h"
 #include <ArduinoJson.h>
 #include <WiFi.h>
@@ -5,7 +8,7 @@
 #include <WiFiClientSecure.h>
 #include <WiFiUdp.h>
 #include "PubSubClient.h"
-
+#include <math.h>
 /*
 * Enable Test mode
 */
@@ -53,19 +56,25 @@ JsonObject fields = doc.createNestedObject("fields");
  * Sensor/Actuator configurations
  */
 
-const int moisture_sensor1 = 2;
-const int moisture_sensor2 = 35;
+const int moisture_sensor1 = 32;
+const int moisture_sensor2 = 33;
 const int moisture_sensor3 = 34;
-int AirValue1 = 3300;
-int AirValue2 = 3200;
-int AirValue3 = 2800;
-int WaterValue1 = 1200;
-int WaterValue2 = 1000;
-int WaterValue3 = 1000;
+int AirValue1 = 2700;
+int AirValue2 = 2850;
+int AirValue3 = 2550;
+int WaterValue1 = 1000;
+int WaterValue2 = 1350;
+int WaterValue3 = 950;
+
 
 int soilmoisturepercent = 0;
 const int indicator_led = 21;
 
+
+#define DHTPIN 15
+#define DHTTYPE DHT22
+
+DHT dht(DHTPIN, DHTTYPE);
 
 /*
 * Interrupts
@@ -89,7 +98,7 @@ void setup()
 {
 
   Serial.begin(115200);
-  Serial.println(F("Bedroom1 - soil moisture"));
+  Serial.println(thing_id);
   Serial.println(clientID);
 
   /*
@@ -129,6 +138,9 @@ void setup()
   /*
   * Misc.
   */
+
+   dht.begin();
+
 }
 
 void message_callback(char *topic, byte *message, unsigned int length)
@@ -231,19 +243,31 @@ void loop()
       cur_time = timeClient.getFormattedTime();
       doc["time"] = cur_time;
 
-      soilmoisturepercent = map(analogRead(moisture_sensor1), AirValue1, WaterValue1, 0, 100);
+      soilmoisturepercent = min(100, max(0, (int)map(analogRead(moisture_sensor1), AirValue1, WaterValue1, 0, 100)));
       Serial.print(soilmoisturepercent);
       Serial.print(",");
       fields["ss1"].set(soilmoisturepercent);
 
-      soilmoisturepercent = map(analogRead(moisture_sensor2), AirValue2, WaterValue2, 0, 100);
+      soilmoisturepercent = min(100, max(0, (int)map(analogRead(moisture_sensor2), AirValue2, WaterValue2, 0, 100)));
       Serial.print(soilmoisturepercent);
       Serial.print(",");
       fields["ss2"].set(soilmoisturepercent);
 
-      soilmoisturepercent = map(analogRead(moisture_sensor3), AirValue3, WaterValue3, 0, 100);
+      soilmoisturepercent = min(100, max(0, (int)map(analogRead(moisture_sensor3), AirValue3, WaterValue3, 0, 100)));
       Serial.println(soilmoisturepercent);
       fields["ss3"].set(soilmoisturepercent);
+
+      // DHT sensor values
+      float h = dht.readHumidity();
+      float t = dht.readTemperature();
+
+      Serial.print("temp: ");
+      Serial.println(t);
+      Serial.print("humidity: ");
+      Serial.println(h);
+
+      fields["humidity"].set(soilmoisturepercent);
+      fields["temp"].set(soilmoisturepercent);
 
       serializeJson(doc, JSONmessageBuffer);
       if (client.publish(data_topic, JSONmessageBuffer))

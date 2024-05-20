@@ -16,4 +16,3 @@
 #define mqtt_password_config "password"
 
 #define interr_time_rate_config 3000000
-#define pump_timeout_config 600
