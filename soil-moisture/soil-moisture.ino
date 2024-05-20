@@ -266,8 +266,8 @@ void loop()
       Serial.print("humidity: ");
       Serial.println(h);
 
-      fields["humidity"].set(soilmoisturepercent);
-      fields["temp"].set(soilmoisturepercent);
+      fields["humidity"].set(h);
+      fields["temp"].set(t);
 
       serializeJson(doc, JSONmessageBuffer);
       if (client.publish(data_topic, JSONmessageBuffer))
